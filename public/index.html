@@ -1,0 +1,222 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>React Tutorial</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.0.1/react.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.0.1/react-dom.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.23/browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.3.5/marked.min.js"></script>
+  </head>
+  <body>
+    <div id="content"></div>
+    <!--<script type="text/babel" src="scripts/example.js"></script>-->
+    <script type="text/babel">
+      // tutorial1.js
+      //Arbol:
+      /*
+        -CommentBox: El Container de todo el app
+          -CommentList: Contiene la lista de todos los commentarios
+            -Comment: Un Comentario. Formado por autor y texto
+            -Comment
+          -CommentForm: Permitirá crear nuevos comentarios
+
+      */
+      
+      //Ejemplo de comentarios que se harán
+      var data = [
+          {id:1, author:"Jonathan Tefera", text:"Hola al primer comentario"},
+          {id:2, author:"Nahum Tefera", text:"Este es el segundo"}
+      ];
+
+
+      //Componente de Comentario
+      //Toma del componente padre(CommentList) los datos de autor y texto
+      var Comment = React.createClass({
+         render: function() {
+          return (
+              <div className="comment">
+                  <h2 className="commentAuthor"> 
+                      {this.props.author}
+                  </h2>
+                  <p> 
+                      {this.props.children}
+                  </p>
+              </div>
+          )
+         } 
+      });
+
+      //Componente de CommentList
+      //Contiene la lista de todos los comentarios
+      //Recibe del padre(CommentBox) un array 
+      //de objetos que describen comentarios
+      var CommentList = React.createClass({
+          render: function() {
+              //Recibimos el array data desde CommentBox 
+              //a través del argumento data
+              //Creamos ramas Comment que añadiremos sobre el box de CommentList
+              //Creamos los nodos de dichas ramas:
+              var commentNodes = this.props.data.map(function(comment){
+                  //commentNodes es por tanto un array formado por componente
+                  //Comment formado por el mapeo de los datos del array data
+                  return (
+                    <Comment author={comment.author} key={comment.id}>
+                      {comment.text}
+                    </Comment>  
+                  );
+              });
+              //El return de CommentList
+              //Llamamos a los nodos commentNodes
+              return (
+                  <div className="commentList">
+                      {commentNodes}
+                  </div>
+              );
+          }    
+      });
+
+      var CommentForm = React.createClass({
+        //Inicializamos el formulario con los valores de autor y texto vacios:
+        getInitialState: function() {
+            return {
+                author: '',
+                text: ''
+            };
+        },
+        //Función que será llamada cada vez que hay un onChange event para el autor:
+        handleAuthorChange: function(e) {
+            //e de event
+            //this apunto a nuestro componente
+            //Cambiamos el estado del autor al texto que hay añadido al input
+            //Al cambiar el estado, se llama a render
+            this.setState({author: e.target.value});
+        },
+        //Función que será llamada cada vez que hay un onChange event para el autor:
+        handleTextChange: function(e) {
+            //e de event
+            //this apunto a nuestro componente
+            //Cambiamos el estado del texto al texto que hay añadido al input
+            //Al cambiar el estado, se llama a render
+            this.setState({text: e.target.value});
+        },
+        handleSubmit: function(e){
+            //e de event de submit
+            //this apunto a nuestro componente
+            //Prevenimos la acción por defecto de submit con el método
+            //preventDefault()
+            //Reininciamos los estados de autor y texto del componente
+            e.preventDefault();
+            //Llamamos al método de CommentBox que trata con comment submits:
+            this.props.onCommentSubmit({
+              author: this.state.author,
+              text: this.state.text
+            });
+            this.setState({
+                author: "",
+                text: ""
+            });
+        },
+        render: function() {
+            return (
+                <form className="CommentForm" onSubmit={this.handleSubmit}>
+                    <input
+                        type="text"
+                        className="author"
+                        placeholder="Your name"
+                        onChange={this.handleAuthorChange}
+                        value={this.state.author}
+                    />  
+                    <input 
+                        type="text"
+                        className="text"
+                        placeholder="Your text"
+                        onChange={this.handleTextChange}
+                        value={this.state.text}
+                    />
+                    <input 
+                        type="submit"
+                        value="Post it!"
+                    />
+                </form>
+            );
+        }
+      });
+      //Container de todo. Recibe del script el array con comentarios
+      //Crea como hijos a CommentList y CommentForm
+      var CommentBox = React.createClass({
+      loadCommentsFromServer: function(){
+          //No es un método del prototipo de la clase
+          //es creado por nosotros
+          $.ajax({
+              url: this.props.url,
+              dataType: 'json',
+              cache: false,
+              success: function(data){
+                  this.setState({'data': data});
+              }.bind(this),
+              error: function(xhr, status, err){
+                  console.error(this.props.url, status, err.toString());
+              }
+          });
+      },
+      getInitialState: function() {
+          //Es llamado cuando se hace el primer render
+          return {data: []}
+      },
+      componentDidMount: function() {
+         //Es llamado al finalizar del primer render
+         //Llama a la función con el ajax y crea un intervalo para 
+         //que dicha función sea llamada cada cierto tiempo 
+         this.loadCommentsFromServer();
+         setInterval(this.loadCommentsFromServer, this.props.pullInterval);
+      },
+      handleCommentSubmit: function(comment) {
+          //Optimistic update
+          //Actualizamos la lista de comentarios añadiendo este comentario al array
+          //hasta que el array sea actualizado por el ajax:
+          var comments = this.state.data;
+          comment.id = Date.now();
+          var newComments = comments.concat([comment]);
+          this.setState({'data': newComments});
+          
+          //Enviando al servidor el comentario. 
+          //Tras acabar, actualiza el stado con la nueva lista de comentarios
+          $.ajax({
+              url: this.props.url,
+              dataType: 'json',
+              type: 'POST',
+              data: comment,
+              success: function(data){
+                  //Esto se añadirá a CommentBox.
+                  //data contiene la lista de comentarios
+                  //Debe formar parte del state data de CommentBox
+                  //this en este caso hace referencia a este objeto,
+                  //hacemos el bind para que haga referencia al CommentBox
+                  this.setState({'data': data});
+              }.bind(this),
+              error: function(xhr, status, err){
+                  console.error(this.props.url, status, err.toString());
+              }.bind(this)
+          });
+      },
+      render: function(){
+          //Función principal:
+          return (
+            <div className="commentBox">
+              <CommentList data={this.state.data} />
+              <CommentForm onCommentSubmit={this.handleCommentSubmit} />
+            </div>
+          );
+      }        
+      }); 
+      //Crea la raiz, genera el motor de React
+      //y lo coloca todo en el div content
+      ReactDOM.render(
+          <CommentBox url="api/comments" pullInterval={2000} />
+      , document.getElementById('content'));
+    </script>
+  </body>
+</html>
